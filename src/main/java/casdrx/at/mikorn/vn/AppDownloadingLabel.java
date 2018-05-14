@@ -15,6 +15,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Author Mikorn vietnam
@@ -146,10 +149,16 @@ public class AppDownloadingLabel implements ContantNameTable {
         if (null == session) {
             return;
         }
+        Set<String> set = new HashSet<>(Arrays.asList(
+                FilenameUtils.getBaseName(fileEntry.getAbsolutePath())
+                        + "_0001." + FilenameUtils.getExtension(fileEntry.getAbsolutePath())
+        ));
         Runnable runnable = () -> {
             Insert insert = QueryBuilder.insertInto(KEY_SPACE, TB_MASTER_FILE)
                     .value("file_name",fileEntry.getName())
                     .value("cur_version", 1)
+                    .value("annotated_status", VersionState.ARCHIVED.getState())
+                    .value("list_frame_names", set)
                     //annotated_status
                     .value("file_extension",
                             FilenameUtils.getExtension(fileEntry.getAbsolutePath()))
@@ -175,14 +184,16 @@ public class AppDownloadingLabel implements ContantNameTable {
         if (null == session) {
             return;
         }
+
         Runnable runnable = () -> {
             Insert insert = QueryBuilder.insertInto(KEY_SPACE, TB_ANNOTATED_FILE)
                     .value("file_name",fileEntry.getName())
-                    .value("frame_index", 1)
+                    .value("frame_name", fileEntry.getName() + FilenameUtils.getBaseName(fileEntry.getAbsolutePath())
+                            + "_0001." + FilenameUtils.getExtension(fileEntry.getAbsolutePath()))
                     .value("cur_version", 1)
                     .value("annotated_frame_unit_extension",
                             FilenameUtils.getExtension(fileEntry.getAbsolutePath()))
-                    .value("version_ready_state", VersionState.DOWNLOADING.getState())
+                    .value("version_ready_state", VersionState.UPLOADING.getState())
 //                    .value("version_last_accessed_time", System.currentTimeMillis())
                     .value("annotated_frame_raw_data", ByteBuffer.wrap(bytes));
 
@@ -208,13 +219,14 @@ public class AppDownloadingLabel implements ContantNameTable {
         Runnable runnable = () -> {
             Insert insert = QueryBuilder.insertInto(KEY_SPACE, TB_ORIG_FILE)
                     .value("file_name",fileEntry.getName())
-                    .value("frame_index", 1)
+                    .value("frame_name", FilenameUtils.getBaseName(fileEntry.getAbsolutePath())
+                            + "_0001." + FilenameUtils.getExtension(fileEntry.getAbsolutePath()))
 //                    .value("cur_version", 1)
 //                    .value("prev_version", 0)
                     .value("orig_frame_unit_extension",
                             FilenameUtils.getExtension(fileEntry.getAbsolutePath()))
 //                    .value("version_buffer_flag", false)
-                    .value("org_file_ready_state", VersionState.DOWNLOADING.getState())
+                    .value("org_file_ready_state", VersionState.UPLOADING.getState())
 //                    .value("version_last_accessed_time", System.currentTimeMillis())
                     .value("orig_frame_raw_data", ByteBuffer.wrap(bytes));
 
@@ -239,11 +251,12 @@ public class AppDownloadingLabel implements ContantNameTable {
         Runnable runnable = () -> {
             Insert insert = QueryBuilder.insertInto(KEY_SPACE, TB_GT_DATA)
                     .value("file_name",fileEntry.getName())
-                    .value("frame_index", 0)
+                    .value("gt_timestamp", System.currentTimeMillis())
+//                    .value("frame_index", 0)
                     .value("number_car", 3579)
                     .value("number_pedestrian", 0)
-                    .value("file_extension",
-                            FilenameUtils.getExtension(fileEntry.getAbsolutePath()))
+//                    .value("file_extension",
+//                            FilenameUtils.getExtension(fileEntry.getAbsolutePath()))
                     .value("weather", "rain");
 
             ResultSet result = session.execute(insert.toString());
@@ -265,9 +278,14 @@ public class AppDownloadingLabel implements ContantNameTable {
         if (null == session) {
             return;
         }
+        Set<String> set = new HashSet<>(Arrays.asList(
+                FilenameUtils.getBaseName(fileEntry.getAbsolutePath())
+                        + "_0001." + FilenameUtils.getExtension(fileEntry.getAbsolutePath())));
+
         Runnable runnable = () -> {
             Update.Where update = QueryBuilder.update(KEY_SPACE, TB_LIST_ORIG_UP_DOWN)
-                    .with(QueryBuilder.incr("total_finished_process_frames",0))
+//                    .with(QueryBuilder.incr("total_finished_process_frames",0))
+                    .with(QueryBuilder.set("list_remaining_frame_names",set))
                     .where(QueryBuilder.eq("org_file_ready_state", VersionState.DOWNLOADING.getState()))
                     .and(QueryBuilder.eq("org_file_buffer_flag", false))
                     .and(QueryBuilder.eq("total_frames", 1))
@@ -292,9 +310,15 @@ public class AppDownloadingLabel implements ContantNameTable {
         if (null == session) {
             return;
         }
+        Set<String> set = new HashSet<>(Arrays.asList(
+                FilenameUtils.getBaseName(fileEntry.getAbsolutePath())
+                        + "_0001." + FilenameUtils.getExtension(fileEntry.getAbsolutePath())));
+
         Runnable runnable = () -> {
             Update.Where update = QueryBuilder.update(KEY_SPACE, TB_LIST_ANNOTATED_UP_DOWN)
-                    .with(QueryBuilder.incr("total_finished_process_frames",0))
+//                    .with(QueryBuilder.incr("total_finished_process_frames",0))
+                    .with(QueryBuilder.set("list_remaining_frame_names", set))
+
                     .where(QueryBuilder.eq("version_ready_state", VersionState.DOWNLOADING.getState()))
                     .and(QueryBuilder.eq("version_buffer_flag", false))
                     .and(QueryBuilder.eq("cur_version", 1))
